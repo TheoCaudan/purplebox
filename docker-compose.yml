@@ -1,15 +1,14 @@
 services:
   plc_m340:
-    image: conpot/conpot
+    image: conpot:latest
     container_name: plc_m340
     volumes:
       - ./conpot/config.json:/opt/conpot/config.json
-    command: ["conpot", "-c", "/opt/conpot/config.json"]
     networks:
       ot-net:
         ipv4_address: 192.168.20.10
     ports:
-      - "502:502"  
+      - "502:5020"  
 
   scada_hmi:
     build: ./scada

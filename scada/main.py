@@ -1,12 +1,14 @@
 from pymodbus.client import ModbusTcpClient
 import time
 
-client = ModbusTcpClient("plc_m340", port=502)
+time.sleep(15)
+
+client = ModbusTcpClient("192.168.20.10", port=5020)
 client.connect()
 
 try:
     while True:
-        rr = client.read_holding_registers(0, 3, unit=1)
+        rr = client.read_holding_registers(address=1, count=3)
         if rr.isError():
             print("Read error:", rr)
         else:
