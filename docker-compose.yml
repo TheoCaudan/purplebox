@@ -1,31 +1,132 @@
-networks:
-  ot-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 192.168.20.0/24
-
 services:
-  plc1:
-    build: ./plc1
+  # === IT side (Purple Box) ===
+  purplebox-web:
+    build: ./web
+    container_name: purplebox-web
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./db:/db
+      - ./wait-for-it.sh:/wait-for-it.sh
     networks:
-      ot-net:
-        ipv4_address: 192.168.20.10
-    restart: unless-stopped
+      - orchestration_net
+      - dmz_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 5s
+      retries: 5
+      timeout: 3s
 
-  scada_hmi:
-    build: ./scada_hmi
+  purplebox-orchestrator:
+    build: ./orchestrator
+    container_name: purplebox-orchestrator
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - PURPLEBOX_API=http://purplebox-web:5000
+    volumes:
+      - ./attack_scripts:/attack_scripts
+      - ./redbox_logs:/redbox_logs
+      - ./bluebox_logs:/bluebox_logs
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts/wait-for-it.sh:/wait-for-it.sh
     networks:
-      ot-net:
-        ipv4_address: 192.168.20.20
-    depends_on:
-      - plc1
-    restart: unless-stopped
+      - orchestration_net
+      - dmz_net
+    entrypoint: >
+      sh -c "
+      /wait-for-it.sh purplebox-web:5000 --timeout=60 --strict &&
+      /wait-for-it.sh redbox:80 --timeout=60 --strict &&
+      /wait-for-it.sh dmz-gateway:80 --timeout=60 --strict &&
+      python /orchestrator/main.py
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://purplebox-web:5000"]
+      interval: 10s
+      retries: 5
+      timeout: 3s
 
-  ot_gateway:
-    image: alpine
-    command: tail -f /dev/null
+  # === DMZ Gateway (ports/proxy + optional firewall rules) ===
+  dmz-gateway:
+    image: debian:bullseye-slim
+    cap_add:
+      - NET_ADMIN
+    container_name: dmz-gateway
+    entrypoint: >
+      sh -c "
+      /wait-for-it.sh hmi:8080 --timeout=60 --strict &&
+      /wait-for-it.sh opcua:4840 --timeout=60 --strict &&
+      /wait-for-it.sh conpot:8800 --timeout=60 --strict &&
+      /dmz/firewall.sh
+      "
+    volumes:
+      - ./dmz:/dmz
+      - ./scripts/wait-for-it.sh:/wait-for-it.sh
     networks:
-      ot-net:
-        ipv4_address: 192.168.20.254
+      - dmz_net
+      - level3_net
+      - level2_net
+      - level1_net
+    healthcheck:
+      test: ["CMD", "ping", "-c", "1", "8.8.8.8"]
+      interval: 10s
+      retries: 5
+      timeout: 3s
+
+  # === Purdue Level 3 (Operations) ===
+  hmi:
+    build: ./hmi
+    container_name: hmi
+    networks:
+      - level3_net
+      - level2_net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 10s
+      retries: 5
+      timeout: 3s
+
+  # === Purdue Level 2 (Control) ===
+  opcua:
+    image: open62541/open62541:latest
+    container_name: opcua
+    command: ["/bin/sh", "-c", "echo 'Starting demo OPC UA server'; sleep 3650d"]
+    networks:
+      - level2_net
+      - level1_net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "4840"]
+      interval: 10s
+      retries: 5
+      timeout: 3s
+
+  # === Purdue Level 1/0 (Field / PLC) ===
+  conpot:
+    image: honeynet/conpot:latest
+    container_name: conpot
     restart: unless-stopped
+    ports:
+      - "80:80"
+      - "102:102"
+      - "502:502"
+      - "161:161/udp"
+    networks:
+      - level1_net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8800"]
+      interval: 10s
+      retries: 5
+      timeout: 3s
+      start_period: 10s
+
+networks:
+  orchestration_net:
+    driver: bridge
+  dmz_net:
+    driver: bridge
+  level3_net:
+    driver: bridge
+  level2_net:
+    driver: bridge
+  level1_net:
+    driver: bridge

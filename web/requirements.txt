@@ -1,0 +1,5 @@
+flask==3.0.3
+flask-socketio==5.3.6
+eventlet==0.36.1
+sqlalchemy==2.0.32
+requests==2.32.3

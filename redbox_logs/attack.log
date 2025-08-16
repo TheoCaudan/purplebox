@@ -1,0 +1,16 @@
+1755108620,attack1,dmz-gateway,portscan
+1755108627,attack2,dmz-gateway,modbus_write
+1755108818,attack1,dmz-gateway,portscan
+1755108825,attack2,dmz-gateway,modbus_write
+1755108865,attack1,dmz-gateway,portscan
+1755108873,attack2,dmz-gateway,modbus_write
+1755109958,attack1,dmz-gateway,portscan
+1755109965,attack2,dmz-gateway,modbus_write
+1755110160,attack1,dmz-gateway,portscan
+1755110167,attack2,dmz-gateway,modbus_write
+1755110366,attack1,dmz-gateway,portscan
+1755110373,attack2,dmz-gateway,modbus_write
+1755110723,attack1,dmz-gateway,portscan
+1755110724,attack2,dmz-gateway,modbus_write
+1755110969,attack1,dmz-gateway,portscan
+1755110976,attack2,dmz-gateway,modbus_write
